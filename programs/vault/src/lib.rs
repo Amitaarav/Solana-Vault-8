@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("VauLt1111111111111111111111111111111111111");
+declare_id!("12o36QLa5vizehVGtGd41hwHonLw66Vh56mH7xozniZy");
 
 #[program]
 pub mod vault {
@@ -56,7 +56,7 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = owner,
-        space = 8 + 32 + 8,
+        space = 8 + 32 + 8 + 1, // Vault account's data + bump
         seeds = [b"vault", owner.key().as_ref()],
         bump
     )]
@@ -93,7 +93,7 @@ pub struct Withdraw<'info> {
 
 #[account]
 pub struct Vault {
-    pub owner: Pubkey,
-    pub balance: u64,
-    pub bump: u8,
+    pub owner: Pubkey, // 32 bytes
+    pub balance: u64,   // 8 bytes
+    pub bump: u8,   // 1 byte
 }

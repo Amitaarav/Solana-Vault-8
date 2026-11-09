@@ -1,0 +1,24 @@
+# Rust
+/target/
+
+# Anchor
+.anchor/
+.deploy/
+
+# Node.js
+node_modules/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log
+
+test-ledger
