@@ -17,23 +17,40 @@ pub mod vault {
 
     /// Deposits `amount` lamports from the depositor into their vault.
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
-        let cpi_ix = anchor_lang::solana_program::system_instruction::transfer(
-            &ctx.accounts.depositor.key(),
-            &ctx.accounts.vault.key(),
-            amount,
+
+        // rejects zero-value deposits
+        require!(amount > 0, VaultError::ZeroAmount);
+
+        // calculate new balance and check for overflow
+        let new_balance = ctx.accounts.vault
+                            .balance
+                            .checked_add(amount)
+                            .ok_or(VaultError::ArithmeticOverflow)?;
+
+        let cpi_accounts = anchor_lang::system_program::Transfer {
+            from: ctx.accounts.depositor.to_account_info(),
+            to: ctx.accounts.vault.to_account_info(),
+        };
+
+        // anchor_lang::solana_program::program::invoke(
+        //     &cpi_ix,
+        //     &[
+        //         ctx.accounts.depositor.to_account_info(),
+        //         ctx.accounts.vault.to_account_info(),
+        //         ctx.accounts.system_program.to_account_info(),
+        //     ],
+        // )?;
+
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.system_program.to_account_info(),
+            cpi_accounts,
         );
 
-        anchor_lang::solana_program::program::invoke(
-            &cpi_ix,
-            &[
-                ctx.accounts.depositor.to_account_info(),
-                ctx.accounts.vault.to_account_info(),
-                ctx.accounts.system_program.to_account_info(),
-            ],
-        )?;
+        anchor_lang::system_program::transfer(cpi_ctx, amount)?; 
 
+        // Obtain mutable access only when updating account data.
         let vault = &mut ctx.accounts.vault;
-        vault.balance += amount;
+        vault.balance = new_balance;
 
         Ok(())
     }
@@ -71,6 +88,7 @@ pub struct Initialize<'info> {
 #[derive(Accounts)]
 pub struct Deposit<'info> {
     #[account(
+        mut,
         seeds = [b"vault", vault.owner.as_ref()],
         bump = vault.bump
     )]
@@ -96,4 +114,13 @@ pub struct Vault {
     pub owner: Pubkey, // 32 bytes
     pub balance: u64,   // 8 bytes
     pub bump: u8,   // 1 byte
+}
+
+#[error_code]
+pub enum VaultError {
+    #[msg("Amount must be greater than zero")]
+    ZeroAmount,
+
+    #[msg("Arithmetic overflow occurred")]
+    ArithmeticOverflow,
 }
