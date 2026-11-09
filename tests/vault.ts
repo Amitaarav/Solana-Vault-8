@@ -175,6 +175,29 @@ describe("vault", () => {
 
     assert.isTrue(failed, "Non-owner withdrawal should have failed");
   });
+
+  it("rejects zero-value withdrawal", async () => {
+    const owner = provider.wallet.publicKey;
+
+    const [vaultPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), owner.toBuffer()],
+      program.programId
+    );
+
+    try {
+      await program.methods
+        .withdraw(new anchor.BN(0))
+        .accounts({
+          vault: vaultPda,
+          owner,
+        })
+        .rpc();
+
+      assert.fail("Expected zero-value withdrawal to fail");
+    } catch (error) {
+      assert.include(String(error), "ZeroAmount");
+    }
+  });
   // - withdraw fails cleanly when called by someone who isn't the vault owner
   // - withdraw fails cleanly when amount > current balance (no panics)
   // - any Part 2 features you implement (close_vault, events, withdrawal limit, pause, etc.)
