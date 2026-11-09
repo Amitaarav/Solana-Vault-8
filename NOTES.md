@@ -29,6 +29,47 @@ This document describes the identified issues, security implications, fixes, and
 - Verify stored vault balance.
 - Verify invalid deposits are rejected.
 
+## 2.2 Withdrawal Instruction
+
+**Original issues**
+
+- The withdrawal instruction did not verify that the signer owned the vault.
+- The vault PDA was not validated against the owner's public key.
+- The stored balance was reduced using unchecked subtraction.
+- Zero-value withdrawals were accepted.
+- Actual vault lamports could be reduced without preserving the rent-exempt reserve.
+
+**Production risks**
+
+- Unauthorized users could potentially attempt withdrawals from another user's vault.
+- Invalid account relationships could lead to incorrect account handling.
+- Insufficient-balance withdrawals could cause arithmetic failures.
+- Spending the rent-exempt reserve could make the vault account non-rent-exempt.
+
+**Fixes**
+
+- Added PDA seed and bump validation to the `Withdraw` account context.
+- Added `has_one = owner` to enforce the stored ownership relationship.
+- Used `checked_sub()` to validate the requested withdrawal against the recorded balance.
+- Added zero-amount validation.
+- Checked actual vault lamports and preserved the rent-exempt minimum.
+- Used checked arithmetic when calculating the recipient's resulting lamport balance.
+- Updated vault accounting only after all validations and lamport transfers succeed.
+
+**Design decisions**
+
+- `vault.balance` represents deposited funds and excludes the rent-exempt reserve.
+- Only the vault owner can withdraw.
+- Partial and full withdrawals are permitted.
+- The vault account remains allocated after a full withdrawal; closing it will be handled separately in Part 2.
+
+**Tests**
+
+- Successful withdrawal verifies both actual lamport reduction and internal balance updates.
+- Withdrawal exceeding the recorded balance is rejected.
+- Non-owner withdrawal is rejected by account validation.
+- Failed withdrawal leaves the recorded balance unchanged.
+
 ## 3. Part 2 — Additional Features
 
 To be documented after implementation.

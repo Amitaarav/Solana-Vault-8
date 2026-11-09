@@ -68,6 +68,113 @@ describe("vault", () => {
     
   });
   // - withdraw actually decreases the vault balance and pays out the owner
+
+  it("withdraws SOL from the vault", async () => {
+    const owner = provider.wallet.publicKey;
+    const amount = new anchor.BN(400_000);
+
+    const [vaultPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), owner.toBuffer()],
+      program.programId
+    );
+
+    const vaultBalanceBefore =
+      await provider.connection.getBalance(vaultPda);
+
+    await program.methods
+      .withdraw(amount)
+      .accounts({
+        vault: vaultPda,
+        owner,
+      })
+      .rpc();
+
+    const vaultBalanceAfter =
+      await provider.connection.getBalance(vaultPda);
+
+    const vaultAccount =
+      await program.account.vault.fetch(vaultPda);
+
+    assert.equal(
+      vaultBalanceBefore - vaultBalanceAfter,
+      amount.toNumber()
+    );
+
+    assert.equal(
+      vaultAccount.balance.toNumber(),
+      600_000
+    );
+  });
+
+  it("rejects withdrawal exceeding the vault balance", async () => {
+    const owner = provider.wallet.publicKey;
+    const amount = new anchor.BN(700_000);
+
+    const [vaultPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), owner.toBuffer()],
+      program.programId
+    );
+
+    let failed = false;
+
+    try {
+      await program.methods
+        .withdraw(amount)
+        .accounts({
+          vault: vaultPda,
+          owner,
+        })
+        .rpc();
+    } catch (error) {
+      failed = true;
+      assert.include(String(error), "InsufficientBalance");
+    }
+
+    assert.isTrue(failed, "Withdrawal should have failed");
+
+    const vaultAccount =
+      await program.account.vault.fetch(vaultPda);
+
+    assert.equal(vaultAccount.balance.toNumber(), 600_000);
+  });
+
+  it("rejects withdrawal by a non-owner", async () => {
+    const owner = provider.wallet.publicKey;
+    const attacker = anchor.web3.Keypair.generate();
+
+    const [vaultPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), owner.toBuffer()],
+      program.programId
+    );
+
+    const airdropSignature = await provider.connection.requestAirdrop(
+      attacker.publicKey,
+      anchor.web3.LAMPORTS_PER_SOL
+    );
+
+    await provider.connection.confirmTransaction(
+      airdropSignature,
+      "confirmed"
+    );
+
+    let failed = false;
+
+    try {
+      await program.methods
+        .withdraw(new anchor.BN(100_000))
+        .accounts({
+          vault: vaultPda,
+          owner: attacker.publicKey,
+        })
+        .signers([attacker])
+        .rpc();
+    } catch (error) {
+      failed = true;
+      assert.include(String(error), "ConstraintSeeds");
+    }
+
+    assert.isTrue(failed, "Non-owner withdrawal should have failed");
+  });
   // - withdraw fails cleanly when called by someone who isn't the vault owner
   // - withdraw fails cleanly when amount > current balance (no panics)
   // - any Part 2 features you implement (close_vault, events, withdrawal limit, pause, etc.)

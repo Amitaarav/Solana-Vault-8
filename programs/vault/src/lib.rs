@@ -57,12 +57,51 @@ pub mod vault {
 
     /// Withdraws `amount` lamports from the caller's vault back to the caller.
     pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
-        let vault = &mut ctx.accounts.vault;
+        // bugs: owner , pda , zero amount validation missing
+        // bugs: rent -revese check
 
-        vault.balance -= amount;
+        // rejects zero-value deposits
+        require!(amount > 0, VaultError::ZeroAmount);
 
-        **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? -= amount;
-        **ctx.accounts.owner.to_account_info().try_borrow_mut_lamports()? += amount;
+        let vault_info = ctx.accounts.vault.to_account_info();
+        let owner_info = ctx.accounts.owner.to_account_info();
+
+        // let vault = &mut ctx.accounts.vault;
+        
+        // calculate updated balance and check for overflow
+        let new_balance = ctx.accounts.vault
+                            .balance
+                            .checked_sub(amount)
+                            .ok_or(VaultError::InsufficientBalance)?;
+        
+        
+        // calculating remaining actual funds/lamports
+        let remaining_lamports = vault_info.lamports()
+                                    .checked_sub(amount)
+                                    .ok_or(VaultError::InsufficientVaultFunds)?;
+
+        // preserver the rent-exempt minimum
+        let rent_minimum = Rent::get()?.minimum_balance(vault_info.data_len());
+        
+        require!(
+            remaining_lamports >= rent_minimum,
+            VaultError::InsufficientVaultFunds
+        );
+
+        // calculate the owner's resulting lamports balance
+
+        let owner_new_lamports = owner_info
+                                    .lamports()
+                                    .checked_add(amount)
+                                    .ok_or(VaultError::ArithmeticOverflow)?;
+
+        // vault.balance -= amount; // unchecked subtraction
+
+        **vault_info.try_borrow_mut_lamports()? = remaining_lamports;
+        **owner_info.try_borrow_mut_lamports()? = owner_new_lamports;
+
+        // update the vault's internal accounting
+        ctx.accounts.vault.balance = new_balance;
 
         Ok(())
     }
@@ -102,7 +141,12 @@ pub struct Deposit<'info> {
 
 #[derive(Accounts)]
 pub struct Withdraw<'info> {
-    #[account(mut)]
+    #[account(
+        mut,
+        seeds = [b"vault", owner.key().as_ref()],
+        bump = vault.bump,
+        has_one = owner
+    )]
     pub vault: Account<'info, Vault>,
 
     #[account(mut)]
@@ -123,4 +167,10 @@ pub enum VaultError {
 
     #[msg("Arithmetic overflow occurred")]
     ArithmeticOverflow,
+
+    #[msg("Insufficient vault balance")]
+    InsufficientBalance,
+
+    #[msg("Insufficient vault funds after preserving rent reserve")]
+    InsufficientVaultFunds,
 }
