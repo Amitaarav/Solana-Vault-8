@@ -105,6 +105,27 @@ pub mod vault {
 
         Ok(())
     }
+
+    // closes the vault and returns its rent reserve to the owner.
+    // the vault must have zero deposited balance.
+
+    pub fn close_vault(ctx: Context<CloseVault>) -> Result<()> {
+        require!(
+            ctx.accounts.vault.balance == 0,
+            VaultError::NonZeroBalance
+        );
+
+        // no manual transfer of lamports
+        // when transaction succeeds, anchor process `close = owner` and automatically
+        // 1. Transfers all the remaining vault lamports to the owner
+        // 2. Closes the vault acount.
+        // 3. Reclaims the account's allocated data
+
+        // if validation fails, the account remains untouched
+
+
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -153,6 +174,21 @@ pub struct Withdraw<'info> {
     pub owner: Signer<'info>,
 }
 
+#[derive(Accounts)]
+pub struct CloseVault<'info> {
+    #[account(
+        mut,
+        close = owner,
+        seeds = [b"vault", owner.key().as_ref()],
+        bump = vault.bump,
+        has_one = owner
+    )]
+    pub vault: Account<'info, Vault>,
+
+    #[account(mut)]
+    pub owner: Signer<'info>
+}
+
 #[account]
 pub struct Vault {
     pub owner: Pubkey, // 32 bytes
@@ -173,4 +209,7 @@ pub enum VaultError {
 
     #[msg("Insufficient vault funds after preserving rent reserve")]
     InsufficientVaultFunds,
+
+    #[msg("Cannot close vault while deposited balance is non-zero")]
+    NonZeroBalance,
 }

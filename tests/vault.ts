@@ -34,7 +34,7 @@ describe("vault", () => {
   // - deposit actually increases the vault balance and the on-chain lamport balance
   it("deposits SOL into the vault", async () => {
     const owner = provider.wallet.publicKey;
-    const amount = new anchor.BN(1_000_000) // 0.001 SOL
+    const amount = new anchor.BN(1_000_000); // 0.001 SOL
 
     const [vaultPda] = anchor.web3.PublicKey.findProgramAddressSync(
       [Buffer.from("vault"), owner.toBuffer()],
@@ -107,6 +107,7 @@ describe("vault", () => {
   });
 
   it("rejects withdrawal exceeding the vault balance", async () => {
+
     const owner = provider.wallet.publicKey;
     const amount = new anchor.BN(700_000);
 
@@ -201,4 +202,112 @@ describe("vault", () => {
   // - withdraw fails cleanly when called by someone who isn't the vault owner
   // - withdraw fails cleanly when amount > current balance (no panics)
   // - any Part 2 features you implement (close_vault, events, withdrawal limit, pause, etc.)
+
+  // Rejects closing a non-empty vault
+  it("rejects closing a vault with non-zero balance", async()=>{
+    const owner = provider.wallet.publicKey;
+
+    const [vaultPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), owner.toBuffer()],
+      program.programId
+    )
+    const balanceBefore = await program.account.vault.fetch(vaultPda);
+
+    try{
+      await program.methods
+        .closeVault()
+        .accounts({
+          vault: vaultPda,
+          owner
+        })
+        .rpc();
+
+        assert.fail("Expected closing a non-empty vault to fail");
+
+    }catch(error){
+      assert.include(String(error), "NonZeroBalance");
+    }
+
+    const balanceAfter = await program.account.vault.fetch(vaultPda);
+
+    assert.equal(
+      balanceAfter.balance.toNumber(),
+      balanceBefore.balance.toNumber()
+    );
+  });
+
+
+  it("closes an empty vault and reclaims rent", async () => {
+    // Create a fresh owner to avoid the provider wallet's huge balance.
+    const owner = anchor.web3.Keypair.generate();
+
+    // Give the owner a small balance.
+    const airdropSignature = await provider.connection.requestAirdrop(
+      owner.publicKey,
+      anchor.web3.LAMPORTS_PER_SOL
+    );
+
+    const latestBlockhash = await provider.connection.getLatestBlockhash();
+
+    await provider.connection.confirmTransaction(
+      {
+        signature: airdropSignature,
+        ...latestBlockhash,
+      },
+      "confirmed"
+    );
+
+    const [vaultPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), owner.publicKey.toBuffer()],
+      program.programId
+    );
+
+    //Initialize a fresh, empty vault.
+    await program.methods
+      .initialize()
+      .accounts({
+        vault: vaultPda,
+        owner: owner.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([owner])
+      .rpc();
+
+    const vaultAccount = await program.account.vault.fetch(vaultPda);
+
+    assert.equal(vaultAccount.balance.toNumber(), 0);
+
+    const vaultLamportsBefore =
+      await provider.connection.getBalance(vaultPda);
+
+    const ownerLamportsBefore =
+      await provider.connection.getBalance(owner.publicKey);
+
+    // Close the empty vault.
+    await program.methods
+      .closeVault()
+      .accounts({
+        vault: vaultPda,
+        owner: owner.publicKey,
+      })
+      .signers([owner])
+      .rpc();
+
+    const ownerLamportsAfter =
+      await provider.connection.getBalance(owner.publicKey);
+
+    const vaultAccountAfter =
+      await provider.connection.getAccountInfo(vaultPda);
+
+    assert.isNull(vaultAccountAfter, "Vault account should no longer exist");
+
+    // The provider wallet pays the transaction fee.
+    // Therefore, the owner should receive all vault lamports.
+    assert.equal(
+      ownerLamportsAfter - ownerLamportsBefore,
+      vaultLamportsBefore,
+      "Owner should receive all remaining vault lamports"
+    );
+  });
+
 });
