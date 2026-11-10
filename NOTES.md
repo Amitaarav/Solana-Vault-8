@@ -232,3 +232,14 @@ Allow the vault owner to pause and resume vault operations. While paused, deposi
 - The tests verify account ownership, PDA validation, SOL transfers, balance accounting, rent preservation, event emission, withdrawal limits, account closure, and pause/resume behavior.
 - Final test result: 16 tests passing, 0 failing.
 - The program was tested against a local Solana validator using anchor test --skip-local-validator.
+
+### Toolchain and Version Notes
+
+- Solana CLI: 1.18.26
+- Anchor CLI: 0.30.1
+- Anchor Rust dependency resolved by Cargo: 0.30.3
+- Rust toolchain: 1.79.0
+- No intentional changes were made to the pinned Anchor versions or project configuration.
+
+Note: The Rust compiler version used in the current environment is newer than the previously tested 1.79.0 toolchain.
+
