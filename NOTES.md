@@ -185,3 +185,33 @@ For example, with a maximum withdrawal of 3 SOL:
 4. Verify the vault balance remains unchanged after rejected withdrawals.
 
 **Result:** All 11 tests in the current suite pass.
+
+## 3.4 — Pause and Resume Vault
+
+### Requirement
+Allow the vault owner to pause and resume vault operations. While paused, deposits and withdrawals must be rejected.
+
+### Implementation
+- Added `paused: bool` to the `Vault` account.
+- Updated account allocation to 58 bytes, including the 8-byte Anchor discriminator.
+- Initialized new vaults with `paused = false`.
+- Implemented the `set_paused` instruction to allow the owner to pause or resume the vault.
+- Validated ownership using PDA seeds, bump, and `has_one = owner`.
+- Added `VaultPaused` as a custom error.
+- Added pause-state validation to both `deposit` and `withdraw`.
+
+### Design Decisions
+- Used a single `set_paused(bool)` instruction instead of separate pause and resume instructions.
+- Only the vault owner can change the pause state.
+- Deposits and withdrawals are blocked while paused.
+- Other operations, such as closing an empty vault, remain available while paused.
+
+### Tests
+1. Owner can pause the vault.
+2. Deposits are rejected while paused.
+3. Withdrawals are rejected while paused.
+4. Owner can resume the vault.
+5. Non-owner cannot pause the vault.
+6. Vault state remains unchanged after an unauthorized pause attempt.
+
+**Result:** All 16 tests in the current suite pass.

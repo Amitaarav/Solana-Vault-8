@@ -133,9 +133,15 @@ describe("vault", () => {
 
     const vaultAccount =
       await program.account.vault.fetch(vaultPda);
-    
+      
+    await provider.connection.confirmTransaction(
+      signature,
+      "confirmed"
+    );
+
     const tx = await provider.connection.getTransaction(signature, {
-      commitment: "confirmed"
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
     });
 
     if(!tx?.meta){
@@ -501,5 +507,113 @@ describe("vault", () => {
 
     const vaultAccount = await provider.connection.getAccountInfo(vaultPda);
     assert.isNull(vaultAccount, "Vault should not be initialized");
+  });
+
+  it("allows the owner to pause the vault", async () => {
+  const owner = provider.wallet.publicKey;
+
+  const [vaultPda] = anchor.web3.PublicKey.findProgramAddressSync(
+    [Buffer.from("vault"), owner.toBuffer()],
+    program.programId
+  );
+
+  await program.methods
+    .setPaused(true)
+    .accounts({ vault: vaultPda, owner })
+    .rpc();
+
+    const vaultAccount = await program.account.vault.fetch(vaultPda);
+
+    assert.isTrue(vaultAccount.paused);
+  });
+
+  it("rejects deposits when the vault is paused", async () => {
+    const owner = provider.wallet.publicKey;
+
+    const [vaultPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), owner.toBuffer()],
+      program.programId
+    );
+
+    try {
+      await program.methods
+        .deposit(new anchor.BN(100_000))
+        .accounts({
+          vault: vaultPda,
+          depositor: owner,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .rpc();
+
+      assert.fail("Expected deposit to fail while paused");
+    } catch (error) {
+      assert.include(String(error), "VaultPaused");
+    }
+  });
+
+  it("rejects withdrawals when the vault is paused", async () => {
+    const owner = provider.wallet.publicKey;
+
+    const [vaultPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), owner.toBuffer()],
+      program.programId
+    );
+
+    try {
+      await program.methods
+        .withdraw(new anchor.BN(100_000))
+        .accounts({ vault: vaultPda, owner })
+        .rpc();
+
+      assert.fail("Expected withdrawal to fail while paused");
+    } catch (error) {
+      assert.include(String(error), "VaultPaused");
+    }
+  });
+
+  it("allows the owner to resume the vault", async () => {
+    const owner = provider.wallet.publicKey;
+
+    const [vaultPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), owner.toBuffer()],
+      program.programId
+    );
+
+    await program.methods
+      .setPaused(false)
+      .accounts({ vault: vaultPda, owner })
+      .rpc();
+
+    const vaultAccount = await program.account.vault.fetch(vaultPda);
+
+    assert.isFalse(vaultAccount.paused);
+  });
+
+  it("rejects pause attempts by a non-owner", async () => {
+    const owner = provider.wallet.publicKey;
+    const attacker = anchor.web3.Keypair.generate();
+
+    const [vaultPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), owner.toBuffer()],
+      program.programId
+    );
+
+    try {
+      await program.methods
+        .setPaused(true)
+        .accounts({
+          vault: vaultPda,
+          owner: attacker.publicKey,
+        })
+        .signers([attacker])
+        .rpc();
+
+      assert.fail("Non-owner should not be able to pause the vault");
+    } catch (error) {
+      assert.include(String(error), "ConstraintSeeds");
+    }
+
+    const vaultAccount = await program.account.vault.fetch(vaultPda);
+    assert.isFalse(vaultAccount.paused);
   });
 });

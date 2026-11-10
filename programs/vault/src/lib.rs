@@ -19,6 +19,7 @@ pub mod vault {
         vault.balance = 0;
         vault.max_withdrawal = max_withdrawal;
         vault.bump = ctx.bumps.vault;
+        vault.paused = false;
         Ok(())
     }
 
@@ -27,6 +28,11 @@ pub mod vault {
 
         // rejects zero-value deposits
         require!(amount > 0, VaultError::ZeroAmount);
+
+        require!(
+            !ctx.accounts.vault.paused,
+            VaultError::VaultPaused
+        );
 
         // calculate new balance and check for overflow
         let new_balance = ctx.accounts.vault
@@ -63,6 +69,11 @@ pub mod vault {
     pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
 
         require!(amount > 0, VaultError::ZeroAmount);
+
+        require!(
+            !ctx.accounts.vault.paused,
+            VaultError::VaultPaused
+        );
 
         require!(
             amount <= ctx.accounts.vault.max_withdrawal,
@@ -136,6 +147,12 @@ pub mod vault {
 
         Ok(())
     }
+
+    pub fn set_paused(ctx: Context<SetPaused>, paused: bool) -> Result<()> {
+        ctx.accounts.vault.paused = paused;
+
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -143,7 +160,7 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = owner,
-        space = 8 + 32 + 8 + 8 + 1, // Vault account's data + bump
+        space = 8 + 32 + 8 + 8 + 1 + 1, // Vault account's data + bump
         seeds = [b"vault", owner.key().as_ref()],
         bump
     )]
@@ -199,12 +216,26 @@ pub struct CloseVault<'info> {
     pub owner: Signer<'info>
 }
 
+#[derive(Accounts)]
+pub struct SetPaused<'info> {
+    #[account(
+        mut,
+        seeds = [b"vault", owner.key().as_ref()],
+        bump = vault.bump,
+        has_one = owner
+    )]
+    pub vault: Account<'info, Vault>,
+
+    pub owner: Signer<'info>,
+}
+
 #[account]
 pub struct Vault {
     pub owner: Pubkey, // 32 bytes
     pub max_withdrawal: u64, // 8 bytes
     pub balance: u64,   // 8 bytes
     pub bump: u8,   // 1 byte
+    pub paused: bool, // 1 byte
 }
 
 #[error_code]
@@ -229,6 +260,9 @@ pub enum VaultError {
 
     #[msg("Withdrawal amount exceeds the maximum allowed per transaction")]
     WithdrawalLimitExceeded,
+
+    #[msg("Vault is currently paused")]
+    VaultPaused
 }
 
 #[event]
