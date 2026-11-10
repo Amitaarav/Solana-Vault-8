@@ -17,17 +17,22 @@ This document describes the identified issues, security implications, fixes, and
 - Account modification could fail due to incorrect account privileges.
 - Arithmetic overflow could cause unexpected transaction failures.
 - Zero-value transactions consume resources without meaningful deposits.
+- Without checked addition, a sufficiently large deposit could cause an arithmetic overflow in the recorded balance.
 
 **Fix**
 - Marked the vault account mutable.
 - Used checked arithmetic.
 - Added validation for zero-value deposits.
 - Used Anchor's typed System Program CPI helper.
+- Deposits are permissionless: any signer can deposit  SOL into an existing vault; the depositor does not need to be the vault owner.
+- The vault PDA is validated using the stored owner's public key and the stored bump.
+- The recorded balance is updated only after the System Program transfer succeeds.
 
 **Tests**
 - Verify actual lamports transferred.
 - Verify stored vault balance.
 - Verify invalid deposits are rejected.
+- Verify that the DepositEvent contains the correct vault owner, deposited amount, and resulting balance.
 
 ## 2.2 Withdrawal Instruction
 
@@ -55,6 +60,9 @@ This document describes the identified issues, security implications, fixes, and
 - Checked actual vault lamports and preserved the rent-exempt minimum.
 - Used checked arithmetic when calculating the recipient's resulting lamport balance.
 - Updated vault accounting only after all validations and lamport transfers succeed.
+- Calculated the owner's resulting lamport balance using `checked_add()` to prevent arithmetic overflow.
+- Used direct lamport mutation because the vault account is owned by the program; this avoids requiring PDA signing for a System Program transfer.
+- Ensured the withdrawal amount is deducted from both actual vault lamports and the recorded balance.
 
 **Design decisions**
 
@@ -62,6 +70,9 @@ This document describes the identified issues, security implications, fixes, and
 - Only the vault owner can withdraw.
 - Partial and full withdrawals are permitted.
 - The vault account remains allocated after a full withdrawal; closing it will be handled separately in Part 2.
+- The recorded `vault.balance` tracks deposited funds and excludes the rent-exempt reserve.
+- The vault account remains open after its recorded balance reaches zero.
+- The withdrawal instruction preserves the rent-exempt minimum required by the vault account.
 
 **Tests**
 
@@ -215,3 +226,9 @@ Allow the vault owner to pause and resume vault operations. While paused, deposi
 6. Vault state remains unchanged after an unauthorized pause attempt.
 
 **Result:** All 16 tests in the current suite pass.
+
+## 4. Overall Verification
+- All implemented Part 1 bug fixes and Part 2 features were tested using the Anchor test suite.
+- The tests verify account ownership, PDA validation, SOL transfers, balance accounting, rent preservation, event emission, withdrawal limits, account closure, and pause/resume behavior.
+- Final test result: 16 tests passing, 0 failing.
+- The program was tested against a local Solana validator using anchor test --skip-local-validator.
