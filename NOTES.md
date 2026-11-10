@@ -103,3 +103,53 @@ Two approaches were considered for closing the vault.
 
 **Final Decision:** The vault can only be closed when its recorded deposited balance is zero. This approach provides predictable behavior and keeps withdrawal and closure responsibilities separate.
 
+## 3.2 — Deposit and Withdrawal Events
+
+### Requirement
+
+Emit on-chain events whenever SOL is deposited into or withdrawn from a vault.
+
+Each event contains:
+- `owner`: Public key of the vault owner.
+- `amount`: Amount deposited or withdrawn in lamports.
+- `balance`: Resulting vault balance after the operation.
+
+### Implementation Approach
+
+- Defined `DepositEvent` and `WithdrawEvent` using Anchor's `#[event]` macro.
+- Used Anchor's `emit!` macro to emit events from the respective instructions.
+- Events are emitted after successfully updating the vault's recorded balance.
+- Included the vault owner's public key to identify the vault associated with each event.
+
+### Event Flow
+
+**Deposit:**
+1. Validate the deposit amount.
+2. Transfer SOL into the vault.
+3. Update the recorded vault balance.
+4. Emit `DepositEvent`.
+
+**Withdrawal:**
+1. Validate the withdrawal amount and available balance.
+2. Transfer SOL to the owner.
+3. Update the recorded vault balance.
+4. Emit `WithdrawEvent`.
+
+### Testing
+
+- Verified that `DepositEvent` is emitted.
+- Verified that `WithdrawEvent` is emitted.
+- Checked the event owner public key.
+- Checked the transaction amount.
+- Checked the resulting vault balance.
+- Parsed transaction logs using Anchor's `EventParser`.
+
+### Important Note
+
+Anchor exposes event names in camelCase through its TypeScript event parser:
+- `DepositEvent` → `depositEvent`
+- `WithdrawEvent` → `withdrawEvent`
+
+Events are emitted through transaction logs and do not create additional account storage.
+
+**Result:** Both deposit and withdrawal event implementations compile successfully, and all tests pass.

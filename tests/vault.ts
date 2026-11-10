@@ -9,6 +9,11 @@ describe("vault", () => {
 
   const program = anchor.workspace.Vault as Program<Vault>;
 
+  const eventParser = new anchor.EventParser(
+    program.programId,
+    program.coder
+  );
+
   it("initializes a vault", async () => {
     const owner = provider.wallet.publicKey;
     const [vaultPda] = anchor.web3.PublicKey.findProgramAddressSync(
@@ -43,7 +48,7 @@ describe("vault", () => {
 
     const vaultBalanceBefore = await provider.connection.getBalance(vaultPda);
     
-    await program.methods 
+    const signature = await program.methods 
           .deposit(amount)
           .accounts({
             vault: vaultPda,
@@ -55,6 +60,36 @@ describe("vault", () => {
     const vaultBalanceAfter = await provider.connection.getBalance(vaultPda);
     
     const vaultAccount = await program.account.vault.fetch(vaultPda);
+
+    const tx = await provider.connection.getTransaction(signature, {
+      commitment: "confirmed"
+    });
+    
+    assert.isNotNull(tx);
+    assert.isNotNull(tx.meta);
+
+    const events = [...eventParser.parseLogs(tx.meta.logMessages ?? [])];
+
+    const depositEvent = events.find(
+      (event) => event.name === "depositEvent"
+    );
+
+    assert.exists(depositEvent, "depositEvent should be emitted");
+
+    assert.equal(
+      depositEvent.data.owner.toBase58(),
+      owner.toBase58()
+    );
+
+    assert.equal(
+      depositEvent.data.amount.toNumber(),
+      amount.toNumber()
+    );
+
+    assert.equal(
+      depositEvent.data.balance.toNumber(),
+      amount.toNumber()
+    );
 
     assert.equal(
       vaultBalanceAfter - vaultBalanceBefore,
@@ -81,7 +116,7 @@ describe("vault", () => {
     const vaultBalanceBefore =
       await provider.connection.getBalance(vaultPda);
 
-    await program.methods
+    const signature = await program.methods
       .withdraw(amount)
       .accounts({
         vault: vaultPda,
@@ -94,7 +129,39 @@ describe("vault", () => {
 
     const vaultAccount =
       await program.account.vault.fetch(vaultPda);
+    
+    const tx = await provider.connection.getTransaction(signature, {
+      commitment: "confirmed"
+    });
 
+    if(!tx?.meta){
+      throw new Error("Transaction metadata or logs not found")
+    }
+    
+    const events = [
+      ...eventParser.parseLogs(tx.meta.logMessages ?? [])
+    ];
+
+    const withdrawEvent = events.find(
+      (event) => event.name === "withdrawEvent"
+    )
+
+    assert.exists(withdrawEvent, "withdrawEvent should be emitted");
+
+    assert.equal(
+      withdrawEvent.data.owner.toBase58(),
+      owner.toBase58()
+    );
+
+    assert.equal(
+      withdrawEvent.data.amount.toNumber(),
+      amount.toNumber()
+    );
+
+    assert.equal(
+      withdrawEvent.data.balance.toNumber(),
+      600_000
+    );
     assert.equal(
       vaultBalanceBefore - vaultBalanceAfter,
       amount.toNumber()

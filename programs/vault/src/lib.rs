@@ -52,6 +52,12 @@ pub mod vault {
         let vault = &mut ctx.accounts.vault;
         vault.balance = new_balance;
 
+        emit!(DepositEvent {
+            owner: ctx.accounts.vault.owner,
+            amount,
+            balance: new_balance
+        });
+
         Ok(())
     }
 
@@ -102,6 +108,12 @@ pub mod vault {
 
         // update the vault's internal accounting
         ctx.accounts.vault.balance = new_balance;
+
+        emit!(WithdrawEvent {
+            owner: ctx.accounts.vault.owner,
+            amount,
+            balance: new_balance
+        });
 
         Ok(())
     }
@@ -212,4 +224,18 @@ pub enum VaultError {
 
     #[msg("Cannot close vault while deposited balance is non-zero")]
     NonZeroBalance,
+}
+
+#[event]
+pub struct DepositEvent {
+    pub owner: Pubkey,
+    pub amount: u64,
+    pub balance: u64
+}
+
+#[event]
+pub struct WithdrawEvent {
+    pub owner: Pubkey,
+    pub amount: u64,
+    pub balance: u64
 }
