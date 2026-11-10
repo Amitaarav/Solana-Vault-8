@@ -22,7 +22,7 @@ describe("vault", () => {
     );
 
     await program.methods
-      .initialize()
+      .initialize(new anchor.BN(3_000_000_000))
       .accounts({
         vault: vaultPda,
         owner,
@@ -33,6 +33,10 @@ describe("vault", () => {
     const vaultAccount = await program.account.vault.fetch(vaultPda);
     assert.equal(vaultAccount.owner.toBase58(), owner.toBase58());
     assert.equal(vaultAccount.balance.toNumber(), 0);
+    assert.equal(
+      vaultAccount.maxWithdrawal.toNumber(),
+      3_000_000_000
+    )
   });
 
   // TODO (candidate): add tests covering:
@@ -137,7 +141,7 @@ describe("vault", () => {
     if(!tx?.meta){
       throw new Error("Transaction metadata or logs not found")
     }
-    
+
     const events = [
       ...eventParser.parseLogs(tx.meta.logMessages ?? [])
     ];
@@ -331,7 +335,7 @@ describe("vault", () => {
 
     //Initialize a fresh, empty vault.
     await program.methods
-      .initialize()
+      .initialize(new anchor.BN(3_000_000_000))
       .accounts({
         vault: vaultPda,
         owner: owner.publicKey,
@@ -377,4 +381,125 @@ describe("vault", () => {
     );
   });
 
+  it("rejects withdrawal exceeding the maximum withdrawal limit", async () => {
+    const owner = provider.wallet.publicKey;
+    const amount = new anchor.BN(3_000_000_001);
+    const [vaultPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), owner.toBuffer()],
+      program.programId
+    );
+
+    try {
+      await program.methods
+        .withdraw(amount)
+        .accounts({
+          vault: vaultPda,
+          owner,
+        })
+        .rpc();
+
+      assert.fail("Expected withdrawal limit validation to fail");
+    } catch (error) {
+      assert.include(String(error), "WithdrawalLimitExceeded");
+    }
+
+    const vaultAccount = await program.account.vault.fetch(vaultPda);
+
+    assert.equal(vaultAccount.balance.toNumber(), 600_000);
+  })
+
+  it("allows withdrawal exactly equal to the maximum withdrawal limit", async () => {
+    const owner = anchor.web3.Keypair.generate();
+
+    const airdropSignature = await provider.connection.requestAirdrop(
+      owner.publicKey,
+      10 * anchor.web3.LAMPORTS_PER_SOL
+    );
+
+    await provider.connection.confirmTransaction(
+      airdropSignature,
+      "confirmed"
+    );
+
+    const [vaultPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), owner.publicKey.toBuffer()],
+      program.programId
+    );
+
+    await program.methods
+      .initialize(new anchor.BN(3_000_000_000))
+      .accounts({
+        vault: vaultPda,
+        owner: owner.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([owner])
+      .rpc();
+
+    await program.methods
+      .deposit(new anchor.BN(4_000_000_000))
+      .accounts({
+        vault: vaultPda,
+        depositor: owner.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([owner])
+      .rpc();
+
+    await program.methods
+      .withdraw(new anchor.BN(3_000_000_000))
+      .accounts({
+        vault: vaultPda,
+        owner: owner.publicKey,
+      })
+      .signers([owner])
+      .rpc();
+
+    const vaultAccount = await program.account.vault.fetch(vaultPda);
+
+    assert.equal(vaultAccount.balance.toNumber(), 1_000_000_000);
+  });
+
+  it("rejects initialization with zero maximum withdrawal", async () => {
+    const owner = anchor.web3.Keypair.generate();
+
+    const airdropSignature = await provider.connection.requestAirdrop(
+      owner.publicKey,
+      anchor.web3.LAMPORTS_PER_SOL
+    );
+
+    const latestBlockhash = await provider.connection.getLatestBlockhash();
+
+    await provider.connection.confirmTransaction(
+      {
+        signature: airdropSignature,
+        ...latestBlockhash,
+      },
+      "confirmed"
+    );
+
+    const [vaultPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), owner.publicKey.toBuffer()],
+      program.programId
+    );
+
+    try {
+      await program.methods
+        .initialize(new anchor.BN(0))
+        .accounts({
+          vault: vaultPda,
+          owner: owner.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([owner])
+        .rpc();
+
+      assert.fail("Expected initialization with zero maximum withdrawal to fail");
+    } catch (error) {
+      assert.include(String(error), "InvalidMaxWithdrawal");
+    }
+
+    const vaultAccount = await provider.connection.getAccountInfo(vaultPda);
+    assert.isNull(vaultAccount, "Vault should not be initialized");
+  });
 });

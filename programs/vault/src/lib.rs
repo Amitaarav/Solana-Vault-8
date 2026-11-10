@@ -7,10 +7,17 @@ pub mod vault {
     use super::*;
 
     /// Creates a personal vault PDA for the calling owner.
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>, max_withdrawal: u64) -> Result<()> {
+
+        require!(
+            max_withdrawal > 0,
+            VaultError::InvalidMaxWithdrawal
+        );
+
         let vault = &mut ctx.accounts.vault;
         vault.owner = ctx.accounts.owner.key();
         vault.balance = 0;
+        vault.max_withdrawal = max_withdrawal;
         vault.bump = ctx.bumps.vault;
         Ok(())
     }
@@ -31,15 +38,6 @@ pub mod vault {
             from: ctx.accounts.depositor.to_account_info(),
             to: ctx.accounts.vault.to_account_info(),
         };
-
-        // anchor_lang::solana_program::program::invoke(
-        //     &cpi_ix,
-        //     &[
-        //         ctx.accounts.depositor.to_account_info(),
-        //         ctx.accounts.vault.to_account_info(),
-        //         ctx.accounts.system_program.to_account_info(),
-        //     ],
-        // )?;
 
         let cpi_ctx = CpiContext::new(
             ctx.accounts.system_program.to_account_info(),
@@ -63,17 +61,17 @@ pub mod vault {
 
     /// Withdraws `amount` lamports from the caller's vault back to the caller.
     pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
-        // bugs: owner , pda , zero amount validation missing
-        // bugs: rent -revese check
 
-        // rejects zero-value deposits
         require!(amount > 0, VaultError::ZeroAmount);
+
+        require!(
+            amount <= ctx.accounts.vault.max_withdrawal,
+            VaultError::WithdrawalLimitExceeded
+        );
 
         let vault_info = ctx.accounts.vault.to_account_info();
         let owner_info = ctx.accounts.owner.to_account_info();
 
-        // let vault = &mut ctx.accounts.vault;
-        
         // calculate updated balance and check for overflow
         let new_balance = ctx.accounts.vault
                             .balance
@@ -145,7 +143,7 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = owner,
-        space = 8 + 32 + 8 + 1, // Vault account's data + bump
+        space = 8 + 32 + 8 + 8 + 1, // Vault account's data + bump
         seeds = [b"vault", owner.key().as_ref()],
         bump
     )]
@@ -204,6 +202,7 @@ pub struct CloseVault<'info> {
 #[account]
 pub struct Vault {
     pub owner: Pubkey, // 32 bytes
+    pub max_withdrawal: u64, // 8 bytes
     pub balance: u64,   // 8 bytes
     pub bump: u8,   // 1 byte
 }
@@ -224,6 +223,12 @@ pub enum VaultError {
 
     #[msg("Cannot close vault while deposited balance is non-zero")]
     NonZeroBalance,
+
+    #[msg("Maximum withdrawal must be greater than zero")]
+    InvalidMaxWithdrawal,
+
+    #[msg("Withdrawal amount exceeds the maximum allowed per transaction")]
+    WithdrawalLimitExceeded,
 }
 
 #[event]

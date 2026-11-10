@@ -153,3 +153,35 @@ Anchor exposes event names in camelCase through its TypeScript event parser:
 Events are emitted through transaction logs and do not create additional account storage.
 
 **Result:** Both deposit and withdrawal event implementations compile successfully, and all tests pass.
+
+## 3.3 — Maximum Withdrawal Limit
+
+### Requirement
+Configure a maximum withdrawal amount when initializing a vault and reject any individual withdrawal exceeding that limit.
+
+### Implementation
+- Added `max_withdrawal: u64` to the `Vault` account.
+- Updated account allocation to accommodate the additional 8-byte field.
+- Updated the `initialize` instruction to accept and store the maximum withdrawal amount.
+- Added validation to reject zero maximum withdrawal during initialization.
+- Added withdrawal validation to reject amounts exceeding the configured limit.
+- Introduced two custom errors:
+  - `InvalidMaxWithdrawal`
+  - `WithdrawalLimitExceeded`
+
+### Design Decision
+The maximum withdrawal is a per-transaction limit, not a cumulative lifetime limit.
+
+For example, with a maximum withdrawal of 3 SOL:
+- A withdrawal of 2 SOL is allowed.
+- A withdrawal of exactly 3 SOL is allowed.
+- A withdrawal of 3 SOL + 1 lamport is rejected.
+- Multiple withdrawals are allowed as long as each individual withdrawal respects the limit and sufficient vault funds are available.
+
+### Tests
+1. Reject withdrawal exceeding the configured maximum.
+2. Allow withdrawal exactly equal to the configured maximum.
+3. Reject initialization with zero maximum withdrawal.
+4. Verify the vault balance remains unchanged after rejected withdrawals.
+
+**Result:** All 11 tests in the current suite pass.
