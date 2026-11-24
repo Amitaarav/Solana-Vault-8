@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solana Vault Dashboard | Anchor 0.30</title>
+  <style>
+    /* Reset & Base */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    :root {
+      --bg: #090a0f;
+      --card-bg: #11131a;
+      --subcard-bg: #161822;
+      --border: #1f2330;
+      --border-focus: #38bdf8;
+      --text-main: #f4f4f6;
+      --text-muted: #9499ad;
+      --text-dim: #64687d;
+      --emerald: #10b981;
+      --emerald-bg: rgba(16, 185, 129, 0.12);
+      --emerald-border: rgba(16, 185, 129, 0.3);
+      --cyan: #06b6d4;
+      --cyan-bg: rgba(6, 182, 212, 0.12);
+      --cyan-border: rgba(6, 182, 212, 0.3);
+      --amber: #f59e0b;
+      --amber-bg: rgba(245, 158, 11, 0.12);
+      --amber-border: rgba(245, 158, 11, 0.3);
+      --rose: #f43f5e;
+      --rose-bg: rgba(244, 63, 94, 0.12);
+      --rose-border: rgba(244, 63, 94, 0.3);
+      --ease-snappy: cubic-bezier(0.23, 1, 0.32, 1);
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    ::selection {
+      background: #27273a;
+      color: #38bdf8;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #272b3c;
+      border-radius: 3px;
+    }
+
+    /* Container & Layout */
+    .container {
+      width: 100%;
+      max-width: 1150px;
+      margin: 0 auto;
+      padding: 0 1.25rem;
+    }
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(12, 14, 21, 0.95);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 0.85rem 0;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    .header-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: #141724;
+      border: 1px solid #2d3245;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--emerald);
+    }
+    .brand-title {
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .brand-badge {
+      font-size: 10px;
+      font-weight: 600;
+      background: var(--emerald-bg);
+      color: var(--emerald);
+      border: 1px solid var(--emerald-border);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .brand-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Controls & Buttons */
+    .btn-snappy {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 0.5rem 0.9rem;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: transform 140ms var(--ease-snappy), background-color 140ms ease, border-color 140ms ease;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .btn-snappy:hover:not(:disabled) {
+        transform: translateY(-1px);
+      }
+      .btn-snappy:active:not(:disabled) {
+        transform: translateY(0px) scale(0.99);
+      }
+    }
+    .btn-snappy:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .btn-emerald {
+      background: var(--emerald);
+      color: #050608;
+      border-color: var(--emerald);
+    }
+    .btn-emerald:hover:not(:disabled) {
+      background: #059669;
+    }
+    .btn-cyan {
+      background: var(--cyan);
+      color: #050608;
+      border-color: var(--cyan);
+    }
+    .btn-cyan:hover:not(:disabled) {
+      background: #0891b2;
+    }
+    .btn-amber-outline {
+      background: var(--amber-bg);
+      color: var(--amber);
+      border-color: var(--amber-border);
+    }
+    .btn-rose-outline {
+      background: var(--rose-bg);
+      color: var(--rose);
+      border-color: var(--rose-border);
+    }
+    .btn-dark {
+      background: #161822;
+      color: var(--text-main);
+      border-color: #24293b;
+    }
+    .btn-dark:hover:not(:disabled) {
+      border-color: #3b425d;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .subcard {
+      background: var(--subcard-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.85rem;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.75rem;
+    }
+
+    /* Inputs */
+    .input-group {
+      display: flex;
+      border: 1px solid #2d3245;
+      background: var(--subcard-bg);
+      border-radius: 6px;
+      overflow: hidden;
+      margin: 0.5rem 0;
+    }
+    .input-group:focus-within {
+      border-color: var(--border-focus);
+    }
+    .input-field {
+      flex: 1;
+      background: transparent;
+      border: none;
+      padding: 0.55rem 0.75rem;
+      color: #fff;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 14px;
+      outline: none;
+    }
+    .input-suffix {
+      padding: 0.55rem 0.75rem;
+      background: rgba(255,255,255,0.02);
+      border-left: 1px solid #2d3245;
+      font-size: 11px;
+      font-family: ui-monospace, monospace;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+    }
+
+    /* Typography & Utilities */
+    .font-mono { font-family: ui-monospace, SFMono-Regular, monospace; }
+    .text-emerald { color: var(--emerald); }
+    .text-cyan { color: var(--cyan); }
+    .text-amber { color: var(--amber); }
+    .text-rose { color: var(--rose); }
+    .text-muted { color: var(--text-muted); }
+    .text-dim { color: var(--text-dim); }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-emerald { background: var(--emerald-bg); color: var(--emerald); border: 1px solid var(--emerald-border); }
+    .badge-amber { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+    .badge-dark { background: #1c1f2e; color: var(--text-dim); border: 1px solid #2d3245; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; }
+
+    /* Banner */
+    .banner {
+      padding: 0.65rem 1rem;
+      border-radius: 8px;
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+    .banner-success { background: var(--emerald-bg); border: 1px solid var(--emerald-border); color: #34d399; }
+    .banner-error { background: var(--rose-bg); border: 1px solid var(--rose-border); color: #fb7185; }
+
+    /* Log */
+    .log-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid #1a1c27;
+      font-size: 12px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="container header-inner">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <circle cx="12" cy="11" r="2.5"/>
+            <path d="M12 13.5V16"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">
+            SOLANA VAULT <span class="brand-badge">ANCHOR 0.30</span>
+          </div>
+          <div class="brand-sub">Non-custodial personal asset vault</div>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:0.6rem;">
+        <select id="clusterSelect" style="background:#141724; color:#d1d5db; border:1px solid #24293b; padding:4px 8px; border-radius:6px; font-size:12px; outline:none;">
+          <option value="devnet">Solana Devnet</option>
+          <option value="localnet">Localnet (127.0.0.1:8899)</option>
+          <option value="mainnet">Mainnet Beta</option>
+        </select>
+        <div class="subcard" style="padding:4px 10px; display:flex; align-items:center; gap:8px;">
+          <div style="text-align:right;">
+            <div id="walletAddrTop" class="font-mono" style="font-size:11px; color:#e2e8f0;">7xK9...3nPq</div>
+            <div id="walletBalTop" class="font-mono" style="font-size:10px; color:var(--text-dim);">5.000 SOL</div>
+          </div>
+          <button id="btnSwitchWallet" class="btn-snappy btn-dark" style="padding:2px 6px; font-size:10px;">Switch</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container" style="padding-top:1.25rem; flex:1;">
+    <!-- Alert Banner -->
+    <div id="bannerBox" class="banner banner-success" style="display:none;">
+      <span id="bannerText">Notification</span>
+      <button onclick="document.getElementById('bannerBox').style.display='none'" style="background:none; border:none; color:inherit; cursor:pointer;">✕</button>
+    </div>
+
+    <!-- Dev Wallet Strip -->
+    <div class="subcard" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem; font-size:12px;">
+      <div style="display:flex; align-items:center; gap:6px;">
+        <span class="dot" style="background:var(--cyan);"></span>
+        <span class="text-muted">Connected Dev Wallet:</span>
+        <code id="ownerPubkeyFull" class="font-mono" style="color:#e2e8f0;">7xK9...3nPq</code>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button id="btnAirdrop" class="btn-snappy badge-emerald" style="padding:4px 8px;">+ Airdrop 2 SOL</button>
+        <button id="btnReset" class="btn-snappy btn-dark" style="padding:4px 8px;">Reset Demo</button>
+      </div>
+    </div>
+
+    <!-- Vault Status Card -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:1rem; margin-bottom:1rem;">
+        <div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:11px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:var(--text-muted);">Vault Balance</span>
+            <span id="statusBadge" class="badge badge-emerald">
+              <span class="dot" style="background:var(--emerald);"></span> Active
+            </span>
+          </div>
+          <div style="display:flex; align-items:baseline; gap:6px; margin-top:4px;">
+            <span id="statBalanceSol" class="font-mono" style="font-size:2.2rem; font-weight:800; color:#fff;">1.2500</span>
+            <span style="font-size:14px; font-weight:600; color:var(--text-muted);">SOL</span>
+          </div>
+          <div id="statBalanceLamports" class="font-mono text-dim" style="font-size:11px;">1,250,000,000 lamports</div>
+        </div>
+
+        <div style="display:flex; gap:1rem;">
+          <div class="subcard" style="min-width:140px;">
+            <div class="text-dim" style="font-size:10px; text-transform:uppercase; font-weight:700;">Max Withdrawal / Tx</div>
+            <div id="statMaxLimit" class="font-mono" style="font-size:15px; font-weight:700; color:#fff; margin-top:2px;">1.0000 SOL</div>
+            <div class="text-dim" style="font-size:10px;">Per-tx protection limit</div>
+          </div>
+          <div class="subcard" style="min-width:130px;">
+            <div class="text-dim" style="font-size:10px; text-transform:uppercase; font-weight:700;">PDA Bump</div>
+            <div id="statBump" class="font-mono text-cyan" style="font-size:15px; font-weight:700; margin-top:2px;">254</div>
+            <div class="text-dim" style="font-size:10px;">Seed: [b"vault", owner]</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Address Strip -->
+      <div class="grid-3" style="font-size:11px;">
+        <div class="subcard">
+          <span class="text-dim font-mono" style="font-size:9px; text-transform:uppercase; display:block;">Vault PDA</span>
+          <span id="pdaText" class="font-mono" style="color:#cbd5e1;">4zMm2x...Jn8Xq2</span>
+        </div>
+        <div class="subcard">
+          <span class="text-dim font-mono" style="font-size:9px; text-transform:uppercase; display:block;">Program ID</span>
+          <span class="font-mono" style="color:#cbd5e1;">12o36QLa5vizehVG...xozniZy</span>
+        </div>
+        <div class="subcard">
+          <span class="text-dim font-mono" style="font-size:9px; text-transform:uppercase; display:block;">Rent Reserve</span>
+          <span class="font-mono" style="color:#cbd5e1;">0.00146 SOL (Rent-Exempt)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Operations Grid -->
+    <div class="grid-2">
+      <!-- Deposit Card -->
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:0.75rem;">
+          <div style="display:flex; align-items:center; gap:6px; font-weight:700; font-size:13px;">
+            <span class="brand-icon" style="width:24px; height:24px; color:var(--emerald);">↓</span>
+            <span>Deposit SOL</span>
+          </div>
+          <span class="font-mono text-dim" style="font-size:11px;">Wallet: <span id="depositWalletBal" style="color:#e2e8f0;">5.000 SOL</span></span>
+        </div>
+
+        <div id="depositPausedWarning" class="banner banner-error" style="display:none; margin-top:0.75rem; margin-bottom:0.5rem;">
+          Vault is paused. Deposits blocked (VaultPaused: 6007).
+        </div>
+
+        <div style="margin-top:0.75rem;">
+          <div class="input-group">
+            <input id="depositAmount" type="number" step="0.1" placeholder="0.00" class="input-field">
+            <span class="input-suffix">SOL</span>
+          </div>
+          <div style="display:flex; gap:4px; margin-bottom:0.75rem;">
+            <button onclick="setDeposit(0.1)" class="btn-snappy btn-dark" style="padding:2px 8px; font-size:10px;">+0.1</button>
+            <button onclick="setDeposit(0.5)" class="btn-snappy btn-dark" style="padding:2px 8px; font-size:10px;">+0.5</button>
+            <button onclick="setDeposit(1.0)" class="btn-snappy btn-dark" style="padding:2px 8px; font-size:10px;">+1.0</button>
+          </div>
+          <button id="btnDeposit" class="btn-snappy btn-emerald" style="width:100%; padding:8px;">Confirm Deposit</button>
+        </div>
+      </div>
+
+      <!-- Withdraw Card -->
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:0.75rem;">
+          <div style="display:flex; align-items:center; gap:6px; font-weight:700; font-size:13px;">
+            <span class="brand-icon" style="width:24px; height:24px; color:var(--cyan);">↑</span>
+            <span>Withdraw SOL</span>
+          </div>
+          <span class="font-mono text-dim" style="font-size:11px;">Cap: <span id="withdrawCapBadge" style="color:#e2e8f0;">1.000 SOL</span></span>
+        </div>
+
+        <div id="withdrawPausedWarning" class="banner banner-error" style="display:none; margin-top:0.75rem; margin-bottom:0.5rem;">
+          Vault is paused. Withdrawals blocked (VaultPaused: 6007).
+        </div>
+
+        <div style="margin-top:0.75rem;">
+          <div class="input-group">
+            <input id="withdrawAmount" type="number" step="0.1" placeholder="0.00" class="input-field">
+            <button id="btnWithdrawMax" class="btn-snappy btn-dark" style="padding:0 8px; border-radius:0; border:none; border-left:1px solid #2d3245; color:var(--cyan);">MAX</button>
+            <span class="input-suffix">SOL</span>
+          </div>
+          <div class="text-dim font-mono" style="font-size:10px; margin-bottom:0.75rem;">
+            Anchor rule: amount ≤ max_withdrawal AND balance ≥ amount
+          </div>
+          <button id="btnWithdraw" class="btn-snappy btn-cyan" style="width:100%; padding:8px;">Confirm Withdrawal</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Security Controls -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:0.75rem; margin-bottom:0.75rem;">
+        <span style="font-size:13px; font-weight:700;">Security &amp; Lifecycle Controls</span>
+        <span class="font-mono text-dim" style="font-size:10px;">has_one = owner</span>
+      </div>
+
+      <div class="grid-2">
+        <div class="subcard" style="display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:12px; font-weight:700;">Emergency Circuit Breaker</span>
+              <span id="pauseStatusBadge" class="badge badge-emerald">ACTIVE</span>
+            </div>
+            <p class="text-muted" style="font-size:11px; margin-top:4px;">
+              When paused, all incoming deposits and withdrawals are rejected on-chain by the program.
+            </p>
+          </div>
+          <button id="btnTogglePause" class="btn-snappy btn-amber-outline" style="margin-top:10px; width:100%;">
+            Pause Vault Activity
+          </button>
+        </div>
+
+        <div class="subcard" style="display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:12px; font-weight:700;">Decommission Vault</span>
+              <span class="badge badge-dark">Rent Reclaim</span>
+            </div>
+            <p class="text-muted" style="font-size:11px; margin-top:4px;">
+              Closes the vault account and sweeps the 0.00146 SOL rent-exempt reserve back to your wallet.
+            </p>
+            <div id="closeWarning" class="text-amber font-mono" style="font-size:10px; margin-top:4px;">
+              ⚠ Vault balance must be 0.00 SOL before closing
+            </div>
+          </div>
+          <button id="btnCloseVault" class="btn-snappy btn-rose-outline" style="margin-top:10px; width:100%;">
+            Close Vault Account
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Event Feed -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:0.6rem;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="font-size:13px; font-weight:700;">Activity Log &amp; Event Stream</span>
+          <span id="logCount" class="badge badge-dark">0 entries</span>
+        </div>
+        <button onclick="clearLog()" class="btn-snappy btn-dark" style="padding:2px 8px; font-size:10px;">Clear</button>
+      </div>
+      <div id="logList" style="padding-top:0.5rem;">
+        <div class="text-dim" style="text-align:center; padding:1.5rem 0; font-size:12px;">Ready for transactions.</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer style="border-top:1px solid var(--border); background:#0c0e15; padding:1rem 0; text-align:center; font-size:11px;" class="text-dim font-mono">
+    Solana Vault Program ID: 12o36QLa5vizehVGtGd41hwHonLw66Vh56mH7xozniZy
+  </footer>
+
+  <script>
+    // State
+    const state = {
+      isInitialized: true,
+      walletBalanceSol: 5.0,
+      vaultBalanceSol: 1.25,
+      maxWithdrawalSol: 1.0,
+      paused: false,
+      bump: 254,
+      activities: []
+    };
+
+    function notify(msg, type = "success") {
+      const b = document.getElementById("bannerBox");
+      const t = document.getElementById("bannerText");
+      t.textContent = msg;
+      b.className = type === "success" ? "banner banner-success" : "banner banner-error";
+      b.style.display = "flex";
+      setTimeout(() => { b.style.display = "none"; }, 5000);
+    }
+
+    function addLog(type, amount, status = "confirmed", err = null) {
+      state.activities.unshift({
+        type,
+        amount,
+        balance: state.vaultBalanceSol,
+        status,
+        err,
+        time: new Date().toLocaleTimeString()
+      });
+      renderLog();
+    }
+
+    function renderLog() {
+      const list = document.getElementById("logList");
+      document.getElementById("logCount").textContent = `${state.activities.length} entries`;
+      if (state.activities.length === 0) {
+        list.innerHTML = '<div class="text-dim" style="text-align:center; padding:1.5rem 0; font-size:12px;">No activity recorded yet.</div>';
+        return;
+      }
+      list.innerHTML = state.activities.map(item => `
+        <div class="log-row">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-weight:700; color:${item.status === 'confirmed' ? 'var(--emerald)' : 'var(--rose)'};">
+              ${item.status === 'confirmed' ? '✓' : '✗'}
+            </span>
+            <div>
+              <span style="font-weight:700; text-transform:uppercase;">${item.type}</span>
+              ${item.amount ? `<span class="font-mono text-muted" style="margin-left:6px;">${item.amount} SOL</span>` : ''}
+              ${item.err ? `<div class="text-rose font-mono" style="font-size:10px;">${item.err}</div>` : ''}
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div class="font-mono text-dim" style="font-size:10px;">${item.time}</div>
+            <div class="font-mono text-muted" style="font-size:10px;">Bal: ${item.balance.toFixed(4)} SOL</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function clearLog() {
+      state.activities = [];
+      renderLog();
+    }
+
+    function render() {
+      document.getElementById("statBalanceSol").textContent = state.vaultBalanceSol.toFixed(4);
+      document.getElementById("statBalanceLamports").textContent = `${Math.round(state.vaultBalanceSol * 1e9).toLocaleString()} lamports`;
+      document.getElementById("statMaxLimit").textContent = `${state.maxWithdrawalSol.toFixed(4)} SOL`;
+      document.getElementById("withdrawCapBadge").textContent = `${state.maxWithdrawalSol.toFixed(4)} SOL`;
+      document.getElementById("walletBalTop").textContent = `${state.walletBalanceSol.toFixed(3)} SOL`;
+      document.getElementById("depositWalletBal").textContent = `${state.walletBalanceSol.toFixed(3)} SOL`;
+
+      // Paused State
+      const pauseBadge = document.getElementById("pauseStatusBadge");
+      const pauseBtn = document.getElementById("btnTogglePause");
+      const statusBadge = document.getElementById("statusBadge");
+      const depWarn = document.getElementById("depositPausedWarning");
+      const wthWarn = document.getElementById("withdrawPausedWarning");
+
+      if (state.paused) {
+        pauseBadge.textContent = "PAUSED";
+        pauseBadge.className = "badge badge-amber";
+        pauseBtn.textContent = "Resume Vault Activity";
+        statusBadge.innerHTML = '<span class="dot" style="background:var(--amber);"></span> Paused';
+        statusBadge.className = "badge badge-amber";
+        depWarn.style.display = "flex";
+        wthWarn.style.display = "flex";
+      } else {
+        pauseBadge.textContent = "ACTIVE";
+        pauseBadge.className = "badge badge-emerald";
+        pauseBtn.textContent = "Pause Vault Activity";
+        statusBadge.innerHTML = '<span class="dot" style="background:var(--emerald);"></span> Active';
+        statusBadge.className = "badge badge-emerald";
+        depWarn.style.display = "none";
+        wthWarn.style.display = "none";
+      }
+
+      // Close Warning
+      const closeWarn = document.getElementById("closeWarning");
+      closeWarn.style.display = state.vaultBalanceSol > 0 ? "block" : "none";
+    }
+
+    function setDeposit(val) {
+      document.getElementById("depositAmount").value = val;
+    }
+
+    // Handlers
+    document.getElementById("btnDeposit").addEventListener("click", () => {
+      if (state.paused) {
+        notify("VaultPaused (6007): Vault is currently paused by owner", "error");
+        addLog("deposit", null, "failed", "VaultPaused (6007)");
+        return;
+      }
+      const val = parseFloat(document.getElementById("depositAmount").value);
+      if (isNaN(val) || val <= 0) {
+        notify("ZeroAmount (6000): Deposit amount must be > 0 SOL", "error");
+        return;
+      }
+      if (val > state.walletBalanceSol) {
+        notify("Insufficient wallet balance for deposit", "error");
+        return;
+      }
+      state.walletBalanceSol -= val;
+      state.vaultBalanceSol += val;
+      document.getElementById("depositAmount").value = "";
+      notify(`Successfully deposited ${val} SOL into vault.`);
+      addLog("deposit", val);
+      render();
+    });
+
+    document.getElementById("btnWithdrawMax").addEventListener("click", () => {
+      const maxPossible = Math.min(state.vaultBalanceSol, state.maxWithdrawalSol);
+      document.getElementById("withdrawAmount").value = maxPossible.toFixed(4);
+    });
+
+    document.getElementById("btnWithdraw").addEventListener("click", () => {
+      if (state.paused) {
+        notify("VaultPaused (6007): Vault is currently paused by owner", "error");
+        addLog("withdraw", null, "failed", "VaultPaused (6007)");
+        return;
+      }
+      const val = parseFloat(document.getElementById("withdrawAmount").value);
+      if (isNaN(val) || val <= 0) {
+        notify("ZeroAmount (6000): Amount must be > 0 SOL", "error");
+        return;
+      }
+      if (val > state.maxWithdrawalSol) {
+        notify(`WithdrawalLimitExceeded (6006): Amount ${val} SOL exceeds maximum cap of ${state.maxWithdrawalSol} SOL`, "error");
+        addLog("withdraw", val, "failed", "WithdrawalLimitExceeded (6006)");
+        return;
+      }
+      if (val > state.vaultBalanceSol) {
+        notify("InsufficientBalance (6002): Requested withdrawal exceeds vault balance", "error");
+        addLog("withdraw", val, "failed", "InsufficientBalance (6002)");
+        return;
+      }
+      state.vaultBalanceSol -= val;
+      state.walletBalanceSol += val;
+      document.getElementById("withdrawAmount").value = "";
+      notify(`Successfully withdrew ${val} SOL to wallet.`);
+      addLog("withdraw", val);
+      render();
+    });
+
+    document.getElementById("btnTogglePause").addEventListener("click", () => {
+      state.paused = !state.paused;
+      notify(state.paused ? "Vault paused. Deposits & withdrawals frozen." : "Vault resumed. All operations active.");
+      addLog(state.paused ? "pause" : "unpause", null);
+      render();
+    });
+
+    document.getElementById("btnCloseVault").addEventListener("click", () => {
+      if (state.vaultBalanceSol > 0) {
+        notify("NonZeroBalance (6004): Cannot close vault while balance > 0 SOL. Withdraw all SOL first.", "error");
+        addLog("close", null, "failed", "NonZeroBalance (6004)");
+        return;
+      }
+      state.walletBalanceSol += 0.00146;
+      notify("Vault closed! Reclaimed 0.00146 SOL rent reserve back to wallet.");
+      addLog("close", null);
+      render();
+    });
+
+    document.getElementById("btnAirdrop").addEventListener("click", () => {
+      state.walletBalanceSol += 2.0;
+      notify("Airdropped 2.0 SOL to test wallet.");
+      render();
+    });
+
+    document.getElementById("btnReset").addEventListener("click", () => {
+      state.walletBalanceSol = 5.0;
+      state.vaultBalanceSol = 1.25;
+      state.maxWithdrawalSol = 1.0;
+      state.paused = false;
+      notify("Reset demo state to default.");
+      render();
+    });
+
+    // Initial render
+    render();
+  </script>
+</body>
+</html>

@@ -39,8 +39,6 @@ describe("vault", () => {
     )
   });
 
-  // TODO (candidate): add tests covering:
-  // - deposit actually increases the vault balance and the on-chain lamport balance
   it("deposits SOL into the vault", async () => {
     const owner = provider.wallet.publicKey;
     const amount = new anchor.BN(1_000_000); // 0.001 SOL
@@ -60,13 +58,19 @@ describe("vault", () => {
             systemProgram: anchor.web3.SystemProgram.programId
           })
           .rpc();
+    await provider.connection.confirmTransaction(
+      signature,
+      "confirmed"
+    );
     
     const vaultBalanceAfter = await provider.connection.getBalance(vaultPda);
     
     const vaultAccount = await program.account.vault.fetch(vaultPda);
 
     const tx = await provider.connection.getTransaction(signature, {
-      commitment: "confirmed"
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
+
     });
     
     assert.isNotNull(tx);
@@ -106,7 +110,6 @@ describe("vault", () => {
     );
     
   });
-  // - withdraw actually decreases the vault balance and pays out the owner
 
   it("withdraws SOL from the vault", async () => {
     const owner = provider.wallet.publicKey;
@@ -276,9 +279,6 @@ describe("vault", () => {
       assert.include(String(error), "ZeroAmount");
     }
   });
-  // - withdraw fails cleanly when called by someone who isn't the vault owner
-  // - withdraw fails cleanly when amount > current balance (no panics)
-  // - any Part 2 features you implement (close_vault, events, withdrawal limit, pause, etc.)
 
   // Rejects closing a non-empty vault
   it("rejects closing a vault with non-zero balance", async()=>{
@@ -318,7 +318,6 @@ describe("vault", () => {
     // Create a fresh owner to avoid the provider wallet's huge balance.
     const owner = anchor.web3.Keypair.generate();
 
-    // Give the owner a small balance.
     const airdropSignature = await provider.connection.requestAirdrop(
       owner.publicKey,
       anchor.web3.LAMPORTS_PER_SOL
@@ -339,7 +338,6 @@ describe("vault", () => {
       program.programId
     );
 
-    //Initialize a fresh, empty vault.
     await program.methods
       .initialize(new anchor.BN(3_000_000_000))
       .accounts({
@@ -360,7 +358,6 @@ describe("vault", () => {
     const ownerLamportsBefore =
       await provider.connection.getBalance(owner.publicKey);
 
-    // Close the empty vault.
     await program.methods
       .closeVault()
       .accounts({
